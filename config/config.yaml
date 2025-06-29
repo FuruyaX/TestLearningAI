@@ -1,0 +1,7 @@
+model:
+  hidden_sizes: [128, 64]
+  checkpoint: checkpoints/mnist_model.pt
+
+training:
+  lr: 0.001
+  epochs: 5

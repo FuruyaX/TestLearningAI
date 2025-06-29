@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>手書き数字認識 x NN構造可視化</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <!-- グラフ描画ライブラリ -->
+   
+    <script src="https://cdn.jsdelivr.net/npm/graphology@0.25.1/dist/graphology.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sigma@2.4.0/build/sigma.min.js"></script>
+  <!-- 後から実行するJS -->
+  <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</head>
+<body>
+  <h1>🖍 手書き数字を描いて認識しよう</h1>
+  <canvas id="canvas" width="280" height="280"></canvas>
+
+  <div id="controls">
+    <button id="predictBtn">認識する</button>
+    <button id="clearBtn">クリア</button>
+    <button id="overviewBtn">全体構造 🗺️</button>
+  </div>
+
+  <div id="prediction">🧠 推論結果：<span id="result">（未認識）</span></div>
+</body>
+</html>

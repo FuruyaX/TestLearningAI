@@ -1,0 +1,22 @@
+body {
+  font-family: "Segoe UI", sans-serif;
+  background: #ffffff;
+  margin: 0;
+  padding: 1em;
+  text-align: center;
+  color: #333;
+}
+
+#overview-graph {
+  width: 100%;
+  height: 90vh;
+  border-top: 1px solid #ccc;
+}
+
+#info {
+  background: #f0f0f0;
+  font-family: monospace;
+  font-size: 0.95em;
+  padding: 10px;
+  border-top: 1px solid #ccc;
+}

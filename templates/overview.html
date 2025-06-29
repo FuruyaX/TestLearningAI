@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ネットワーク構造の可視化</title>
+  <script src="https://cdn.jsdelivr.net/npm/graphology@0.25.1/dist/graphology.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sigma@2.4.0/build/sigma.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #ffffff;
+      margin: 0;
+      padding: 1em;
+      text-align: center;
+      color: #333;
+    }
+    #overview-graph {
+      position: relative;
+      width: 100%;
+      height: 90vh;
+      border-top: 1px solid #ccc;
+    }
+    #info {
+      font-family: monospace;
+      font-size: 0.95em;
+      padding: 10px;
+      background: #f7f7f7;
+      border-top: 1px solid #ccc;
+    }
+    #annotations {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      pointer-events: none;
+      display: flex;
+      justify-content: space-around;
+      padding-top: 5px;
+    }
+    #annotations span {
+      font-weight: bold;
+      font-size: 14px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+  <h2>🧠 ニューラルネットワーク構造</h2>
+  <div id="overview-graph">
+    <div id="annotations"></div>
+  </div>
+  <div id="info">ノードをクリックすると活性値と接続がハイライトされます</div>
+
+  <script>
+    window.addEventListener("message", (event) => {
+      const { nodes, edges, prediction } = event.data;
+
+      const Graph = graphology.Graph;
+      const graph = new Graph();
+
+      // 層番号ごとに分類
+      const layerMap = {};
+      nodes.forEach((n) => {
+        const match = n.id.match(/^L(\d+)N/);
+        if (!match) return;
+        const layer = parseInt(match[1]);
+        if (!layerMap[layer]) layerMap[layer] = [];
+        layerMap[layer].push(n);
+      });
+
+      const sortedLayers = Object.keys(layerMap).map(Number).sort((a, b) => a - b);
+
+      // ノード登録（層に応じた色分け）
+      nodes.forEach((n) => {
+        const layer = parseInt(n.id.match(/^L(\d+)N/)[1]);
+        const value = Math.max(0, Math.min(1, n.value));
+        const size = 1 + 4 * value;
+
+        let color = "#aaaaaa";
+        if (layer === sortedLayers[0]) color = "#888"; // 入力層
+        else if (layer === sortedLayers[sortedLayers.length - 1]) color = "#28a745"; // 出力層
+        else color = "#1e90ff"; // 隠れ層
+
+        graph.addNode(n.id, {
+          label: n.label,
+          size,
+          color,
+          x: n.x,
+          y: n.y,
+          value: n.value,
+        });
+      });
+
+      edges.forEach((e) => {
+        graph.addEdge(e.source, e.target, {
+          weight: e.weight,
+          size: Math.max(1, Math.abs(e.weight) * 2),
+          color: e.weight >= 0 ? "#0044cc" : "#cc0000",
+        });
+      });
+
+      const container = document.getElementById("overview-graph");
+      const renderer = new Sigma(graph, container);
+
+      // カメラ自動調整
+      const bounds = graph.extent();
+      const centerX = (bounds[0][0] + bounds[1][0]) / 2;
+      const centerY = (bounds[0][1] + bounds[1][1]) / 2;
+      const width = bounds[1][0] - bounds[0][0];
+      const height = bounds[1][1] - bounds[0][1];
+      const zoom = Math.min(
+        container.clientWidth / (width * 100),
+        container.clientHeight / (height * 100)
+      );
+      renderer.getCamera().setState({ x: centerX, y: centerY, zoom });
+
+      // 層注釈の表示
+      const ann = document.getElementById("annotations");
+      ann.innerHTML = "";
+      sortedLayers.forEach((layer, i) => {
+        const label =
+          i === 0
+            ? "入力層"
+            : i === sortedLayers.length - 1
+            ? `出力層（予測: ${prediction ?? "?"}）`
+            : `隠れ層 L${layer}`;
+        const span = document.createElement("span");
+        span.textContent = label;
+        ann.appendChild(span);
+      });
+
+      // ノードクリック → 活性値＆エッジ強調
+      renderer.on("clickNode", ({ node }) => {
+        const attr = graph.getNodeAttributes(node);
+        document.getElementById("info").textContent = `🔍 ${attr.label} の活性値 = ${attr.value.toFixed(4)}`;
+        graph.forEachEdge((eid, attrs, src, tgt) => {
+          const active = src === node || tgt === node;
+          graph.setEdgeAttribute(eid, "color", active ? "#ffa500" : "#ccc");
+          graph.setEdgeAttribute(eid, "size", active ? 3 : 1);
+        });
+        renderer.refresh();
+      });
+
+      // 背景クリック → リセット
+      renderer.on("clickStage", () => {
+        document.getElementById("info").textContent =
+          "ノードをクリックすると活性値と接続がハイライトされます";
+        graph.forEachEdge((eid) => {
+          graph.setEdgeAttribute(eid, "color", "#ccc");
+          graph.setEdgeAttribute(eid, "size", 1);
+        });
+        renderer.refresh();
+      });
+    });
+  </script>
+</body>
+</html>

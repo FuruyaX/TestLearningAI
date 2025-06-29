@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>学習プロセスの可視化</title>
+  <script src="https://cdn.jsdelivr.net/npm/graphology@0.25.1/dist/graphology.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sigma@2.4.0/build/sigma.min.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 1em;
+      background: #f8f9fa;
+      color: #333;
+      text-align: center;
+    }
+    #viewer {
+      height: 80vh;
+      border: 1px solid #ccc;
+      margin-top: 1em;
+      position: relative;
+    }
+    #controls {
+      margin: 1em;
+    }
+    #info {
+      font-size: 0.95em;
+      margin-top: 0.5em;
+      font-family: monospace;
+    }
+    input[type="range"] {
+      width: 60%;
+    }
+    button {
+      margin: 0 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>🧠 学習プロセスの可視化</h2>
+  <div id="controls">
+    <label for="slider">エポック: <span id="epochLabel">0</span></label><br>
+    <input type="range" id="slider" min="0" max="10" value="0" />
+    <br>
+    <button id="playBtn">▶️ 再生</button>
+    <button id="pauseBtn">⏸️ 停止</button>
+  </div>
+  <div id="viewer"></div>
+  <div id="info">ノードをクリックすると値が表示されます</div>
+  <script>
+  const viewer = document.getElementById("viewer");
+  const slider = document.getElementById("slider");
+  const label = document.getElementById("epochLabel");
+  const info = document.getElementById("info");
+
+  let renderer = null;
+  let timer = null;
+  const maxEpoch = parseInt(slider.max);
+
+  function loadEpoch(epoch) {
+    label.textContent = epoch;
+    fetch(`/training_snapshot/${epoch}`)
+      .then(res => res.json())
+      .then(data => {
+        const Graph = graphology.Graph;
+        const graph = new Graph();
+
+        data.nodes.forEach(n => {
+          graph.addNode(n.id, {
+            label: n.label,
+            x: n.x,
+            y: n.y,
+            size: 1 + 4 * Math.abs(n.value),
+            color: n.value > 0.5 ? "#1e90ff" : "#aaa",
+            value: n.value
+          });
+        });
+
+        data.edges.forEach(e => {
+          graph.addEdge(e.source, e.target, {
+            weight: e.weight,
+            size: Math.max(1, Math.abs(e.weight) * 2),
+            color: e.weight >= 0 ? "#0044cc" : "#cc0000"
+          });
+        });
+
+        if (renderer) renderer.kill();
+        renderer = new Sigma(graph, viewer);
+
+        renderer.on("clickNode", ({ node }) => {
+          const attr = graph.getNodeAttributes(node);
+          info.textContent = `🔍 ${attr.label} = ${attr.value.toFixed(4)}`;
+        });
+
+        renderer.on("clickStage", () => {
+          info.textContent = "ノードをクリックすると値が表示されます";
+        });
+
+        // カメラ自動調整
+        const bounds = graph.extent();
+        const centerX = (bounds[0][0] + bounds[1][0]) / 2;
+        const centerY = (bounds[0][1] + bounds[1][1]) / 2;
+        const width = bounds[1][0] - bounds[0][0];
+        const height = bounds[1][1] - bounds[0][1];
+        const zoom = Math.min(
+          viewer.clientWidth / (width * 100),
+          viewer.clientHeight / (height * 100)
+        );
+        renderer.getCamera().setState({ x: centerX, y: centerY, zoom });
+      });
+  }
+
+  // 初期表示
+  loadEpoch(0);
+
+  slider.addEventListener("input", (e) => {
+    loadEpoch(parseInt(e.target.value));
+  });
+
+  document.getElementById("playBtn").onclick = () => {
+    if (timer) return;
+    timer = setInterval(() => {
+      let val = parseInt(slider.value);
+      if (val < maxEpoch) {
+        val++;
+        slider.value = val;
+        loadEpoch(val);
+      } else {
+        clearInterval(timer);
+        timer = null;
+      }
+    }, 1000);
+  };
+
+  document.getElementById("pauseBtn").onclick = () => {
+    clearInterval(timer);
+    timer = null;
+  };
+</script>
+</body>
+</html>
